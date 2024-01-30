@@ -64,7 +64,7 @@ Don't change above here; write your code below
 # note: models should moved to device defined on line 34.
 
 if args.variant == 'vanilla':
-    model = model.GPT(config = mconf)
+    model = model.GPT(config = mconf).to(device)
 elif args.variant == 'perceiver':
     # set mconf.perceiver, and mconf.bottleneck_dim parameters appropriately.
     pass # [part g] Make some other model here
@@ -92,7 +92,20 @@ if args.function == 'pretrain':
     # final_tokens=200*len(pretrain_dataset)*block_size
     # num_workers=4
     # writer=writer 
-    raise NotImplementedError
+
+    trainer_config = trainer.TrainerConfig(max_epochs=650,
+                                           batch_size=128,
+                                           learning_rate=args.pretrain_lr,
+                                           lr_decay=True,
+                                           warmup_tokens=512*20,
+                                           final_tokens=200*len(pretrain_dataset)*block_size,
+                                           num_workers=0,
+                                           writer=writer)
+    train_ds = dataset.CharCorruptionDataset(data = open(args.pretrain_corpus_path, encoding='utf-8').read(), block_size = block_size)
+    my_trainer = trainer.Trainer(model = model, train_dataset = train_ds, test_dataset = None, config = trainer_config)
+    my_trainer.train()
+    torch.save(model.state_dict(), args.writing_params_path)
+    
 elif args.function == 'finetune':
     assert args.writing_params_path is not None
     assert args.finetune_corpus_path is not None
@@ -136,14 +149,22 @@ elif args.function == 'finetune':
                                                lr_decay=True,
                                                warmup_tokens=512*20,
                                                final_tokens=200*len(pretrain_dataset)*block_size,
-                                               num_workers=0,
+                                               num_workers=4,
                                                writer=writer)
-        train_ds = dataset.NameDataset(pretraining_dataset = pretrain_dataset, data = open(args.finetune_corpus_path, encoding='utf-8').read())
-        my_trainer = trainer.Trainer(model = model, train_dataset = train_ds, test_dataset = None, config = trainer_config)
-        my_trainer.train()
-        torch.save(model.state_dict(), args.writing_params_path)
     else:
-        raise NotImplementedError
+        model.load_state_dict(torch.load(args.reading_params_path))
+        trainer_config = trainer.TrainerConfig(max_epochs=10,
+                                               batch_size=256,
+                                               learning_rate=args.finetune_lr,
+                                               lr_decay=True,
+                                               warmup_tokens=512*20,
+                                               final_tokens=200*len(pretrain_dataset)*block_size,
+                                               num_workers=4,
+                                               writer=writer)
+    train_ds = dataset.NameDataset(pretraining_dataset = pretrain_dataset, data = open(args.finetune_corpus_path, encoding='utf-8').read())
+    my_trainer = trainer.Trainer(model = model, train_dataset = train_ds, test_dataset = None, config = trainer_config)
+    my_trainer.train()
+    torch.save(model.state_dict(), args.writing_params_path)
     
 elif args.function == 'evaluate':
     assert args.outputs_path is not None

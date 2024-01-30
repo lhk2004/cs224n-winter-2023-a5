@@ -167,8 +167,29 @@ class CharCorruptionDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # TODO [part e]: see spec above
-        raise NotImplementedError
+        # retrive the data entry, a.k.a. document
+        document = self.data[idx]    
+        # randomly truncate the document
+        truncate_length = random.randint(4, int(self.block_size * 7 / 8))
+        document = document[0: truncate_length]
+        # break the truncated document into 3 substrings
+        # [prefix] [masked_content] [suffix]
+        masked_content_length = random.randint(int(0.7 * truncate_length * 0.25), int(1.3 * truncate_length * 0.25))
+        masked_content_startpos = random.randint(1, truncate_length - masked_content_length - 1)
+        prefix = document[0: masked_content_startpos]
+        masked_content = document[masked_content_startpos: masked_content_startpos + masked_content_length]
+        suffix = document[masked_content_startpos + masked_content_length:]
+        # rearrange the 3 substrings into the following form (i.e. the masked string):
+        # [prefix] MASK_CHAR [suffix] MASK_CHAR [masked_content] [pads]
+        masked_string = prefix + self.MASK_CHAR + suffix + self.MASK_CHAR + masked_content + self.MASK_CHAR
+        masked_string = masked_string + self.PAD_CHAR * (self.block_size - len(masked_string))
+        # use masked string to construct the input and output example pair
+        inp = masked_string[: -1]
+        out = masked_string[1: ]
+        # encode the input and output example pair into long tensor x and y
+        x = torch.tensor([self.stoi[c] for c in inp], dtype=torch.long)
+        y = torch.tensor([self.stoi[c] for c in out], dtype=torch.long)
+        return x, y
 
 """
 Code under here is strictly for your debugging purposes; feel free to modify
