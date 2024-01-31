@@ -66,8 +66,9 @@ Don't change above here; write your code below
 if args.variant == 'vanilla':
     model = model.GPT(config = mconf).to(device)
 elif args.variant == 'perceiver':
-    # set mconf.perceiver, and mconf.bottleneck_dim parameters appropriately.
-    pass # [part g] Make some other model here
+    mconf.perceiver = True
+    mconf.bottleneck_dim = args.bottleneck_dim
+    model = model.GPT(config = mconf).to(device)
 else:
     raise ValueError("Unknown model variant")
 
@@ -99,7 +100,7 @@ if args.function == 'pretrain':
                                            lr_decay=True,
                                            warmup_tokens=512*20,
                                            final_tokens=200*len(pretrain_dataset)*block_size,
-                                           num_workers=0,
+                                           num_workers=4,
                                            writer=writer)
     train_ds = dataset.CharCorruptionDataset(data = open(args.pretrain_corpus_path, encoding='utf-8').read(), block_size = block_size)
     my_trainer = trainer.Trainer(model = model, train_dataset = train_ds, test_dataset = None, config = trainer_config)

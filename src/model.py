@@ -90,7 +90,20 @@ class DownProjectBlock(nn.Module):
         super().__init__()
         ### YOUR CODE HERE
         ### Hint: Copy over the code from Block and make necessary modifications.
-        pass
+
+        self.C = torch.empty(1, config.bottleneck_dim, config.n_embd)
+        nn.init.xavier_uniform_(self.C)
+        
+        self.ln1 = nn.LayerNorm(config.n_embd)
+        self.ln2 = nn.LayerNorm(config.n_embd)
+        self.attn = attention.CausalCrossAttention(config)
+        self.mlp = nn.Sequential(
+            nn.Linear(config.n_embd, 4 * config.n_embd),
+            nn.GELU(),
+            nn.Linear(4 * config.n_embd, config.n_embd),
+            nn.Dropout(config.resid_pdrop),
+        )
+        
         ### END YOUR CODE
 
     def forward(self, x_input):
@@ -100,7 +113,11 @@ class DownProjectBlock(nn.Module):
         ### YOUR CODE HERE
         ### Hint: Copy over the code from Block and make necessary modifications.
         ### Should be around 3-5 lines.
-        pass
+
+        y1 = self.C + self.attn(x_kv = self.ln1(x_input), x_q = self.ln1(self.C))
+        y1 = y1 + self.mlp(self.ln2(y1))
+        return y1
+        
         ### END YOUR CODE
     
     
@@ -115,7 +132,17 @@ class UpProjectBlock(nn.Module):
         super().__init__()
         ### YOUR CODE HERE
         ### Hint: Copy over the code from Block and make necessary modifications.
-        pass
+
+        self.ln1 = nn.LayerNorm(config.n_embd)
+        self.ln2 = nn.LayerNorm(config.n_embd)
+        self.attn = attention.CausalCrossAttention(config)
+        self.mlp = nn.Sequential(
+            nn.Linear(config.n_embd, 4 * config.n_embd),
+            nn.GELU(),
+            nn.Linear(4 * config.n_embd, config.n_embd),
+            nn.Dropout(config.resid_pdrop),
+        )
+        
         ### END YOUR CODE
     
     def forward(self, y, x_input):
@@ -126,7 +153,11 @@ class UpProjectBlock(nn.Module):
         ### YOUR CODE HERE
         ### Hint: Copy over the code from Block and make necessary modifications.
         ### Should be around 3-5 lines.
-        pass
+
+        yn = x_input + self.attn(x_kv = self.ln1(y), x_q = self.ln1(x_input))
+        yn = yn + self.mlp(self.ln2(yn))
+        return yn
+        
         ### END YOUR CODE
     
 
